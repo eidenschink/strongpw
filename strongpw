@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+"""Generate a strong password.
+
+Usage:
+ strongpw (-h | --help)
+ strongpw (-v | --version)
+ strongpw [--no-punctuation]
+ strongpw [--no-punctuation] <n>
+ strongpw [-r <n>] [-l <n>] [--no-punctuation]
+
+Options:
+ -v --version      Version of the program.
+ -h --help         Show this screen.
+ -r --repeat <n>   Create strong passwords n-time one per line [default: 1].
+ -l --length <n>   Length of password to be created [default: 12].
+ --no-punctuation  Create password without punctuation strings [default: false].
+
+Example:
+ # create a strong 20 character password.
+ strongpw 20 
+
+ # create a not so strong password most services will accept.
+ strongpw 20 --no-punctuation
+
+ # create very strong passwords for 500 "friends" on social media.
+ strongpw -r 500 -l 30
+
+"""
+
+from random import choice
+from docopt import docopt
+import string
+import sys
+
+
+def generate_password(length=8, chars=None):
+    """
+    Return a fixed length string based on a randomized default or given
+    character set.
+    """
+    if chars is None:
+        chars = string.letters + string.digits + string.punctuation
+    return ''.join([choice(chars) for i in xrange(length)])
+
+
+def main(docargs):
+    """Dispatch the work based on arguments."""
+    chars = None
+    if docargs['--no-punctuation']:
+        chars = string.letters + string.digits
+    for i in xrange(int(docargs['--repeat'])):
+        print generate_password(int(docargs['--length']), chars)
+
+
+if __name__ == "__main__":
+    sys.exit(main(docopt(__doc__, version='strongpw 1.0')))
