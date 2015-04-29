@@ -31,25 +31,40 @@ from random import choice
 from docopt import docopt
 import string
 import sys
+import re
 
 
-def generate_password(length=8, chars=None):
+def generate_password(length=12, chars=None):
     """
-    Return a fixed length string based on a randomized default or given
-    character set.
+    Return a fixed length string suitable as a password, based on 
+    a randomized default or given character set.
     """
-    if chars is None:
-        chars = string.letters + string.digits + string.punctuation
-    return ''.join([choice(chars) for i in xrange(length)])
+    if not chars:
+        chars = string.letters + string.digits + string.punctuation + " "
+
+    # http://www.cs.duke.edu/~ola/patterns/plopd/loops.html#loop-and-a-half
+    while True:
+        strongpw = ''.join([choice(chars) for i in xrange(length)])
+        # we do not allow consecutive chars
+        if not re.findall(r"(.)\1\1", strongpw):
+            break
+    return strongpw
 
 
 def main(docargs):
     """Dispatch the work based on arguments."""
     chars = None
+    password_length = int(docargs['<n>'] or docargs['--length'])
+
+    # http://blog.codinghorror.com/your-password-is-too-damn-short/
+    if password_length < 12:
+        raise ValueError('Your password is too damn short.')
+
     if docargs['--no-punctuation']:
-        chars = string.letters + string.digits
+        chars = string.letters + string.digits + " "
+
     for i in xrange(int(docargs['--repeat'])):
-        print generate_password(int(docargs['--length']), chars)
+        print generate_password(password_length, chars)
 
 
 if __name__ == "__main__":
