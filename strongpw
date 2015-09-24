@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 """Generate a strong password.
 
-Usage:
- strongpw (-h | --help)
- strongpw (-v | --version)
- strongpw [--no-punctuation]
- strongpw [--no-punctuation] <n>
- strongpw [-r <n>] [-l <n>] [--no-punctuation]
+Usage: strongpw (-h | --help)
+       strongpw (-v | --version)
+       strongpw [--no-punctuation]
+       strongpw [--no-punctuation] <n>
+       strongpw [-r <n>] [-l <n>] [--no-punctuation]
 
 Options:
- -v --version      Version of the program.
- -h --help         Show this screen.
- -r --repeat <n>   Create strong passwords n-time one per line [default: 1].
- -l --length <n>   Length of password to be created [default: 12].
- --no-punctuation  Create password without punctuation strings [default: false].
+ -v --version          Version of the program.
+ -h --help             Show this screen.
+ -r --repeat <n>       Create strong passwords n-time one per line [default: 1].
+ -l --length <n>       Length of password to be created [default: 12].
+ -p --no-punctuation   Create password without punctuation strings [default: false].
 
 Example:
  # create a strong 20 character password.
