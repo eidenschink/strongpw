@@ -72,13 +72,12 @@ def generate_password(length=12, chars=None, remove_chars=None):
         if strongpw.startswith(' ') or strongpw.endswith(' '):
             continue
 
-        # we do not allow consecutive chars
+        # Make sure we don't have consecutive chars
         if not re.findall(r"(.)\1", strongpw):
-            # at least one lower and upper character + one digit
-            if can_mix:
-                if is_upper_lower_digit(strongpw):
-                    break
+            # If the alphabet allows: support at least one lower and upper character + one digit
+            if can_mix and not is_upper_lower_digit(strongpw):
                 continue
+            # otherwise we're done.
             break
 
     return strongpw
