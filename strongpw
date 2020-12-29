@@ -5,17 +5,18 @@ Usage: strongpw (-h | --help)
        strongpw (-v | --version)
        strongpw [--no-punctuation]
        strongpw [--no-punctuation] <n>
-       strongpw [-r <n>] [-l <n>] [--no-punctuation] [-t <target>]
+       strongpw [-r <n>] [-l <n>] [-d <chars>] [--no-punctuation] [-t <target>]
        strongpw --list-targets
 
 Options:
- -v --version          Version of the program.
- -h --help             Show this screen.
- -r --repeat <n>       Create strong passwords n-time one per line [default: 1].
- -l --length <n>       Length of password to be created [default: 12].
- -p --no-punctuation   Create password without punctuation strings [default: false].
- -t --target <target>  The host, provider or system the password is to be created for.
- --list-targets        Display a list of available targets
+ -v --version           Version of the program.
+ -h --help              Show this screen.
+ -r --repeat <n>        Create strong passwords n-time one per line [default: 1].
+ -l --length <n>        Length of password to be created [default: 12].
+ -p --no-punctuation    Create password without punctuation strings [default: false].
+ -t --target <target>   The host, provider or system the password is to be created for.
+ -d --delete-chars=<chars> Remove characters from the set of characters to generate passwords. [default: '']
+ --list-targets         Display a list of available targets
 
 
 Example:
@@ -41,7 +42,12 @@ targets = {
     'test_weak_alphabet': 'abcdefghijk',
 }
 
-def generate_password(length=12, chars=None):
+def is_upper_lower_digit(alphabet):
+    return any(element.isupper() for element in alphabet) \
+        and any(element.islower() for element in alphabet) \
+        and any(element.isdigit() for element in alphabet)
+
+def generate_password(length=12, chars=None, remove_chars=None):
     """
     Return a fixed length string suitable as a password, based on 
     a randomized default or given character set.
@@ -49,12 +55,13 @@ def generate_password(length=12, chars=None):
     if not chars:
         chars = string.ascii_letters + string.digits + string.punctuation + " "
 
+    if remove_chars:
+        chars = [el for el in chars if el not in list(remove_chars)]
+
     if len(set(list(chars))) < 12:
         raise ValueError('Your alphabet contains not enough characters.')
         
-    can_mix = any(element.isupper() for element in chars) \
-        and any(element.islower() for element in chars) \
-        and any(element.isdigit() for element in chars)
+    can_mix = is_upper_lower_digit(chars)
 
     # http://www.cs.duke.edu/~ola/patterns/plopd/loops.html#loop-and-a-half
     while True:
@@ -65,13 +72,11 @@ def generate_password(length=12, chars=None):
             continue
 
         # we do not allow consecutive chars
-        if not re.findall(r"(.)\1\1", strongpw):
+        if not re.findall(r"(.)\1", strongpw):
             # at least one lower and upper character + one digit
             if can_mix:
-                if (any(c.islower() for c in strongpw)
-                    and any(c.isupper() for c in strongpw)
-                    and any(c.isdigit() for c in strongpw)):
-                        break
+                if is_upper_lower_digit(strongpw):
+                    break
                 continue
             break
 
@@ -93,6 +98,8 @@ def main(docargs):
         print('Your password is too damn short.')
         return 1
 
+    remove_chars = docargs['--delete-chars']
+
     if docargs['--no-punctuation']:
         chars = string.ascii_letters + string.digits + " "
 
@@ -105,7 +112,7 @@ def main(docargs):
             return 2
 
     for i in range(int(docargs['--repeat'])):
-        print(generate_password(password_length, chars))
+        print(generate_password(password_length, chars, remove_chars))
 
 
 if __name__ == "__main__":
