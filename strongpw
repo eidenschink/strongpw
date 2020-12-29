@@ -60,6 +60,10 @@ def generate_password(length=12, chars=None):
     while True:
         strongpw = ''.join([choice(chars) for i in range(length)])
 
+        # some projects trim whitespace, so avoid leading and trailing.
+        if strongpw.startswith(' ') or strongpw.endswith(' '):
+            continue
+
         # we do not allow consecutive chars
         if not re.findall(r"(.)\1\1", strongpw):
             # at least one lower and upper character + one digit
