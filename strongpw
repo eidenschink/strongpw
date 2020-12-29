@@ -1,11 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Generate a strong password.
 
 Usage: strongpw (-h | --help)
        strongpw (-v | --version)
        strongpw [--no-punctuation]
        strongpw [--no-punctuation] <n>
-       strongpw [-r <n>] [-l <n>] [--no-punctuation]
+       strongpw [-r <n>] [-l <n>] [--no-punctuation] [-t <target>]
+       strongpw --list-targets
 
 Options:
  -v --version          Version of the program.
@@ -13,6 +14,9 @@ Options:
  -r --repeat <n>       Create strong passwords n-time one per line [default: 1].
  -l --length <n>       Length of password to be created [default: 12].
  -p --no-punctuation   Create password without punctuation strings [default: false].
+ -t --target <target>  The host, provider or system the password is to be created for.
+ --list-targets        Display a list of available targets
+
 
 Example:
  # create a strong 20 character password.
@@ -26,12 +30,16 @@ Example:
 
 """
 
-from random import choice
+from secrets import choice
 from docopt import docopt
 import string
 import sys
 import re
 
+targets = {
+    'hosteurope_ssh': '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_!&%()=/+#.,;-<>?@*{}[]:\\^| ',
+    'test_weak_alphabet': 'abcdefghijk',
+}
 
 def generate_password(length=12, chars=None):
     """
@@ -39,11 +47,25 @@ def generate_password(length=12, chars=None):
     a randomized default or given character set.
     """
     if not chars:
-        chars = string.letters + string.digits + string.punctuation + " "
+        chars = string.ascii_letters + string.digits + string.punctuation + " "
+
+    if len(set(list(chars))) < 12:
+        raise ValueError('Your alphabet contains not enough characters.')
+        
+    can_mix = any(element.isupper() for element in chars) \
+        and any(element.islower() for element in chars) \
+        and any(element.isdigit() for element in chars)
 
     # http://www.cs.duke.edu/~ola/patterns/plopd/loops.html#loop-and-a-half
     while True:
-        strongpw = ''.join([choice(chars) for i in xrange(length)])
+        strongpw = ''.join([choice(chars) for i in range(length)])
+
+        if can_mix:
+            if (any(c.islower() for c in strongpw)
+                and any(c.isupper() for c in strongpw)
+                and any(c.isdigit() for c in strongpw)):
+                    break
+            continue
         # we do not allow consecutive chars
         if not re.findall(r"(.)\1\1", strongpw):
             break
@@ -55,16 +77,30 @@ def main(docargs):
     chars = None
     password_length = int(docargs['<n>'] or docargs['--length'])
 
+    if docargs['--list-targets']:
+        for target in targets:
+            print(target)
+        return 0
+
     # http://blog.codinghorror.com/your-password-is-too-damn-short/
     if password_length < 12:
-        raise ValueError('Your password is too damn short.')
+        print('Your password is too damn short.')
+        return 1
 
     if docargs['--no-punctuation']:
-        chars = string.letters + string.digits + " "
+        chars = string.ascii_letters + string.digits + " "
 
-    for i in xrange(int(docargs['--repeat'])):
-        print generate_password(password_length, chars)
+    if docargs['--target']:
+        args_target = docargs['--target']
+        if args_target in targets:
+            chars = targets[args_target]
+        else:
+            print("Unknown target.")
+            return 2
+
+    for i in range(int(docargs['--repeat'])):
+        print(generate_password(password_length, chars))
 
 
 if __name__ == "__main__":
-    sys.exit(main(docopt(__doc__, version='strongpw 1.0')))
+    sys.exit(main(docopt(__doc__, version='strongpw 2.0')))
