@@ -58,6 +58,7 @@ def generate_password(length=12, chars=None, remove_chars=None):
     if remove_chars:
         chars = [el for el in chars if el not in list(remove_chars)]
 
+    # If the number of unique elements is hardly more than a set of digits, bark.
     if len(set(list(chars))) < 12:
         raise ValueError('Your alphabet contains not enough characters.')
         
