@@ -60,15 +60,17 @@ def generate_password(length=12, chars=None):
     while True:
         strongpw = ''.join([choice(chars) for i in range(length)])
 
-        if can_mix:
-            if (any(c.islower() for c in strongpw)
-                and any(c.isupper() for c in strongpw)
-                and any(c.isdigit() for c in strongpw)):
-                    break
-            continue
         # we do not allow consecutive chars
         if not re.findall(r"(.)\1\1", strongpw):
+            # at least one lower and upper character + one digit
+            if can_mix:
+                if (any(c.islower() for c in strongpw)
+                    and any(c.isupper() for c in strongpw)
+                    and any(c.isdigit() for c in strongpw)):
+                        break
+                continue
             break
+
     return strongpw
 
 
