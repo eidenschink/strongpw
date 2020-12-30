@@ -18,6 +18,14 @@ $ strongpw
 Eisv&<*U\] B
 ```
 
+Same, but disallow certain characters, e.g. space, asterisk and plus:
+
+```
+$ strongpw -d ' *+'
+&'wZ4PtRh&SC
+```
+
+
 Create a stronger 20 character password:
 
 ```
@@ -32,10 +40,17 @@ strongpw 20 --no-punctuation
 gNQAGzAmxCWj77a4QZI
 ```
 
-Create very strong passwords for 500 "friends" on social media.
+Same but verify the generated password has not been pwned as far as the haveibeenpwned service can tell:
 
 ```
-strongpw -r 500 -l 30
+strongpw --no-punctuation --check-pwned -l 20
+lTRJdsCIXm7YZq26PWRO
+```
+
+Create a given number of passwords with a defined length:
+
+```
+strongpw -r 20 -l 16
 QFEB.*t\![ncvtH`WN{]Jy?"`I(Cbk
 b#x<P"m2Mpx7c@9?}.7y/'#l`m9aAO
 p" :JweaLkeg"B DX^Hn(eLzA^%mSR
@@ -47,4 +62,20 @@ o]~}S{!*l:rKmfZIuw5UOrg:-&prmu
 h)!JhEL.dU%oOsH`F (iv:\M`*v4O_
 !!wt1G~.UW%[j2YY-X@S-N|0zpl?F*
 ...
+```
+
+Create a password based on a given alphabet (target):
+
+```
+strongpw -t hosteurope_ssh
+h62pn;WGNpm^
+```
+
+This is currently rather an implementation idea as alphabets for passwords should usually not be restricted. Might be rather rare nower days.
+
+List the available targets:
+
+```
+hosteurope_ssh
+test_weak_alphabet
 ```
