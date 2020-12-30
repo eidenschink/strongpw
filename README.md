@@ -36,21 +36,21 @@ wDt!P.6O~}H9vY@`P(2j
 Create a not so strong password most services will accept:
 
 ```
-strongpw 20 --no-punctuation
+$ strongpw 20 --no-punctuation
 gNQAGzAmxCWj77a4QZI
 ```
 
 Same but verify the generated password has not been pwned as far as the haveibeenpwned service can tell:
 
 ```
-strongpw --no-punctuation --check-pwned -l 20
+$ strongpw --no-punctuation --check-pwned -l 20
 lTRJdsCIXm7YZq26PWRO
 ```
 
 Create a given number of passwords with a defined length:
 
 ```
-strongpw -r 20 -l 16
+$ strongpw -r 20 -l 16
 QFEB.*t\![ncvtH`WN{]Jy?"`I(Cbk
 b#x<P"m2Mpx7c@9?}.7y/'#l`m9aAO
 p" :JweaLkeg"B DX^Hn(eLzA^%mSR
@@ -67,7 +67,7 @@ h)!JhEL.dU%oOsH`F (iv:\M`*v4O_
 Create a password based on a given alphabet (target):
 
 ```
-strongpw -t hosteurope_ssh
+$ strongpw -t hosteurope_ssh
 h62pn;WGNpm^
 ```
 
@@ -76,6 +76,7 @@ This is currently rather an implementation idea as alphabets for passwords shoul
 List the available targets:
 
 ```
+$ strongpw --list-targets
 hosteurope_ssh
 test_weak_alphabet
 ```
