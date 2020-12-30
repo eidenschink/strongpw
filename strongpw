@@ -21,36 +21,40 @@ Options:
 
 
 Example:
- # create a strong 20 character password.
- strongpw 20 
+# create a strong 20 character password.
+strongpw 20
 
- # create a not so strong password most services will accept.
- strongpw 20 --no-punctuation
+# create a not so strong password most services will accept.
+strongpw 20 --no-punctuation
 
- # create very strong passwords for 500 "friends" on social media.
- strongpw -r 500 -l 30
+# create very strong passwords for 500 "friends" on social media.
+strongpw -r 500 -l 30
 
 """
 
+import hashlib
 from secrets import choice
-from docopt import docopt
 import string
 import sys
 import re
 
-targets = {
+import requests
+from docopt import docopt
+
+TARGETS = {
     'hosteurope_ssh': '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_!&%()=/+#.,;-<>?@*{}[]:\\^| ',
     'test_weak_alphabet': 'abcdefghijk',
 }
 
 def is_upper_lower_digit(alphabet):
+    """Check if argument string contains at least one upper, lower and digit char."""
     return any(element.isupper() for element in alphabet) \
         and any(element.islower() for element in alphabet) \
         and any(element.isdigit() for element in alphabet)
 
 def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
     """
-    Return a fixed length string suitable as a password, based on 
+    Return a fixed length string suitable as a password, based on
     a randomized default or given character set.
     """
     if not chars:
@@ -62,7 +66,7 @@ def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
     # If the number of unique elements is hardly more than a set of digits, bark.
     if len(set(list(chars))) < 12:
         raise ValueError('Your alphabet contains not enough characters.')
-        
+
     can_mix = is_upper_lower_digit(chars)
 
     # don't hammer the API due to a bug.
@@ -98,8 +102,6 @@ def is_pwned(password):
     Pwned Passwords are more than half a billion passwords which have previously been exposed in data breaches.
     See https://haveibeenpwned.com/API/v3#PwnedPasswords
     """
-    import hashlib
-    import requests
     password_sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
     k_anon = password_sha1[0:5]
     k_anon_suffix = password_sha1[5:]
@@ -113,7 +115,7 @@ def is_pwned(password):
         if ele.startswith(k_anon_suffix) and ele.split(':')[1] != '0':
             #print("{} found {} times in pwnedpasswords dataset.".format(password, ele.split(':')[1]))
             return True
-    return False    
+    return False
 
 def main(docargs):
     """Dispatch the work based on arguments."""
@@ -121,7 +123,7 @@ def main(docargs):
     password_length = int(docargs['<n>'] or docargs['--length'])
 
     if docargs['--list-targets']:
-        for target in targets:
+        for target in TARGETS:
             print(target)
         return 0
 
@@ -137,13 +139,13 @@ def main(docargs):
 
     if docargs['--target']:
         args_target = docargs['--target']
-        if args_target in targets:
-            chars = targets[args_target]
+        if args_target in TARGETS:
+            chars = TARGETS[args_target]
         else:
             print("Unknown target.")
             return 2
 
-    for i in range(int(docargs['--repeat'])):
+    for _i in range(int(docargs['--repeat'])):
         print(generate_password(
             password_length,
             chars,
