@@ -5,7 +5,7 @@ Usage: strongpw (-h | --help)
        strongpw (-v | --version)
        strongpw [--no-punctuation]
        strongpw [--no-punctuation] <n>
-       strongpw [-r <n>] [-l <n>] [-d <chars>] [--no-punctuation] [-t <target>]
+       strongpw [-r <n>] [-l <n>] [-d <chars>] [--no-punctuation] [--check-pwned] [-t <target>]
        strongpw --list-targets
 
 Options:
@@ -15,7 +15,8 @@ Options:
  -l --length <n>        Length of password to be created [default: 12].
  -p --no-punctuation    Create password without punctuation strings [default: false].
  -t --target <target>   The host, provider or system the password is to be created for.
- -d --delete-chars=<chars> Remove characters from the set of characters to generate passwords. [default: '']
+ -d --delete-chars=<chars> Remove characters from the set of characters to generate passwords. [default: ''].
+ -c --check-pwned       Utilize the haveibeenpwned.com API to check if the password is already known [default: false].
  --list-targets         Display a list of available targets
 
 
@@ -47,7 +48,7 @@ def is_upper_lower_digit(alphabet):
         and any(element.islower() for element in alphabet) \
         and any(element.isdigit() for element in alphabet)
 
-def generate_password(length=12, chars=None, remove_chars=None):
+def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
     """
     Return a fixed length string suitable as a password, based on 
     a randomized default or given character set.
@@ -77,11 +78,37 @@ def generate_password(length=12, chars=None, remove_chars=None):
             # If the alphabet allows: support at least one lower and upper character + one digit
             if can_mix and not is_upper_lower_digit(strongpw):
                 continue
+            if pwned:
+                if is_pwned(strongpw):
+                    continue
             # otherwise we're done.
             break
 
     return strongpw
 
+def is_pwned(password):
+    """
+    Verify the generated password is not already a known password as far as the Pwned Passwords
+    service can tell.
+    Pwned Passwords are more than half a billion passwords which have previously been exposed in data breaches.
+    See https://haveibeenpwned.com/API/v3#PwnedPasswords
+    """
+    import hashlib
+    import requests
+    password_sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
+    k_anon = password_sha1[0:5]
+    k_anon_suffix = password_sha1[5:]
+    api_result = requests.get('https://api.pwnedpasswords.com/range/' + k_anon)
+    if api_result.status_code != 200:
+        raise Exception('Validation by pwnedpasswords API failed.')
+    content = api_result.text.split()
+    if any(ele.startswith(k_anon_suffix) for ele in content):
+        #for ele in content:
+            #if ele.startswith(k_anon_suffix):
+            #    print("{} found {} times in pwnedpasswords dataset.".format(password, ele.split(':')[1]))
+            #    return True
+        return True
+    return False    
 
 def main(docargs):
     """Dispatch the work based on arguments."""
@@ -112,7 +139,11 @@ def main(docargs):
             return 2
 
     for i in range(int(docargs['--repeat'])):
-        print(generate_password(password_length, chars, remove_chars))
+        print(generate_password(
+            password_length,
+            chars,
+            remove_chars,
+            docargs['--check-pwned']))
 
 
 if __name__ == "__main__":
