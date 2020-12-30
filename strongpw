@@ -65,6 +65,8 @@ def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
         
     can_mix = is_upper_lower_digit(chars)
 
+    # don't hammer the API due to a bug.
+    max_api_attempts = 10
     # http://www.cs.duke.edu/~ola/patterns/plopd/loops.html#loop-and-a-half
     while True:
         strongpw = ''.join([choice(chars) for i in range(length)])
@@ -78,9 +80,12 @@ def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
             # If the alphabet allows: support at least one lower and upper character + one digit
             if can_mix and not is_upper_lower_digit(strongpw):
                 continue
-            if pwned:
+            if pwned and max_api_attempts > 0:
+                max_api_attempts += -1
                 if is_pwned(strongpw):
                     continue
+            elif pwned and max_api_attempts == 0:
+                raise RuntimeError('Reached our contrived API call limit.')
             # otherwise we're done.
             break
 
@@ -98,16 +103,16 @@ def is_pwned(password):
     password_sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
     k_anon = password_sha1[0:5]
     k_anon_suffix = password_sha1[5:]
-    api_result = requests.get('https://api.pwnedpasswords.com/range/' + k_anon)
+    # "Padding" makes the result size of the response less predictable (MITM)
+    headers = {'Add-Padding': 'true'}
+    api_result = requests.get('https://api.pwnedpasswords.com/range/' + k_anon, headers=headers)
     if api_result.status_code != 200:
         raise Exception('Validation by pwnedpasswords API failed.')
     content = api_result.text.split()
-    if any(ele.startswith(k_anon_suffix) for ele in content):
-        #for ele in content:
-            #if ele.startswith(k_anon_suffix):
-            #    print("{} found {} times in pwnedpasswords dataset.".format(password, ele.split(':')[1]))
-            #    return True
-        return True
+    for ele in content:
+        if ele.startswith(k_anon_suffix) and ele.split(':')[1] != '0':
+            #print("{} found {} times in pwnedpasswords dataset.".format(password, ele.split(':')[1]))
+            return True
     return False    
 
 def main(docargs):
