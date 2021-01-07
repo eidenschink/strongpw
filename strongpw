@@ -34,6 +34,7 @@ strongpw -r 500 -l 30
 
 import hashlib
 from secrets import choice
+from typing import Dict, Optional
 import string
 import sys
 import re
@@ -41,21 +42,34 @@ import re
 import requests
 from docopt import docopt
 
-TARGETS = {
+TARGETS: Dict[str, str] = {
     'hosteurope_ssh': '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_!&%()=/+#.,;-<>?@*{}[]:\\^| ',
     'test_weak_alphabet': 'abcdefghijk',
 }
 
-def is_upper_lower_digit(alphabet):
-    """Check if argument string contains at least one upper, lower and digit char."""
+def is_upper_lower_digit(alphabet: str) -> bool:
+    """Check if argument string contains at least one upper, lower and digit char.
+    
+    >>> is_upper_lower_digit("Aa1")
+    True
+    >>> is_upper_lower_digit("abc")
+    False
+    >>> is_upper_lower_digit("A1")
+    False
+    """
     return any(element.isupper() for element in alphabet) \
         and any(element.islower() for element in alphabet) \
         and any(element.isdigit() for element in alphabet)
 
-def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
+def generate_password(length: int = 12, chars: Optional[str] = None, remove_chars: Optional[str] = None, pwned: bool = False) -> str:
     """
     Return a fixed length string suitable as a password, based on
     a randomized default or given character set.
+
+    >>> generate_password(chars="abcdefhABCDEFG12345", remove_chars="abcdeABCDE")
+    Traceback (most recent call last):
+        ...
+    ValueError: Your alphabet contains not enough characters.
     """
     if not chars:
         chars = string.ascii_letters + string.digits + string.punctuation + " "
@@ -95,12 +109,15 @@ def generate_password(length=12, chars=None, remove_chars=None, pwned=False):
 
     return strongpw
 
-def is_pwned(password):
+def is_pwned(password: str) -> bool:
     """
     Verify the generated password is not already a known password as far as the Pwned Passwords
     service can tell.
     Pwned Passwords are more than half a billion passwords which have previously been exposed in data breaches.
     See https://haveibeenpwned.com/API/v3#PwnedPasswords
+
+    >>> is_pwned("1q2w3e4r5t")
+    True
     """
     password_sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
     k_anon = password_sha1[0:5]
