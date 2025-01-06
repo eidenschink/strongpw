@@ -1,174 +1,184 @@
 #!/usr/bin/env python3
 """Generate a strong password.
 
-Usage: strongpw (-h | --help)
-       strongpw (-v | --version)
-       strongpw [--no-punctuation]
-       strongpw [--no-punctuation] <n>
-       strongpw [-r <n>] [-l <n>] [-d <chars>] [--no-punctuation] [--check-pwned] [-t <target>]
-       strongpw --list-targets
+Usage:
+  strongpw (-h | --help)
+  strongpw (-v | --version)
+  strongpw [--no-punctuation] [--length=<n>] [--repeat=<n>] [--delete-chars=<chars>] [--check-pwned] [--target=<target>]
+  strongpw --list-targets
 
 Options:
- -v --version           Version of the program.
- -h --help              Show this screen.
- -r --repeat <n>        Create strong passwords n-time one per line [default: 1].
- -l --length <n>        Length of password to be created [default: 12].
- -p --no-punctuation    Create password without punctuation strings [default: false].
- -t --target <target>   The host, provider or system the password is to be created for.
- -d --delete-chars=<chars> Remove characters from the set of characters to generate passwords. [default: ''].
- -c --check-pwned       Utilize the haveibeenpwned.com API to check if the password is already known [default: false].
- --list-targets         Display a list of available targets
+  -v --version           Version of the program.
+  -h --help              Show this screen.
+  -r --repeat=<n>        Create strong passwords n-times, one per line [default: 1].
+  -l --length=<n>        Length of password to be created [default: 12].
+  -p --no-punctuation    Create password without punctuation [default: False].
+  -t --target=<target>   The host, provider or system the password is to be created for.
+  -d --delete-chars=<chars> Remove characters from the set of characters to generate passwords. [default: ''].
+  -c --check-pwned       Utilize the haveibeenpwned.com API to check if the password is already known [default: False].
+  --list-targets         Display a list of available targets
 
-
-Example:
-# create a strong 20 character password.
-strongpw 20
-
-# create a not so strong password most services will accept.
-strongpw 20 --no-punctuation
-
-# create very strong passwords for 500 "friends" on social media.
-strongpw -r 500 -l 30
-
+Examples:
+  strongpw --length=20
+  strongpw --length=20 --no-punctuation
+  strongpw --repeat=500 --length=30
 """
 
 import hashlib
-from secrets import choice
-from typing import Dict, Optional
 import string
 import sys
 import re
-
+import logging
+from secrets import choice
+from typing import Dict, Optional
 import requests
-from docopt import docopt
+import argparse
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 TARGETS: Dict[str, str] = {
-    'hosteurope_ssh': '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ$_!&%()=/+#.,;-<>?@*{}[]:\\^| ',
+    'hosteurope_ssh': string.ascii_letters + string.digits + "$_!&%()=/+#.,;-<>?@*{}[]:\\^| ",
     'test_weak_alphabet': 'abcdefghijk',
 }
 
 def is_upper_lower_digit(alphabet: str) -> bool:
-    """Check if argument string contains at least one upper, lower and digit char.
-    
-    >>> is_upper_lower_digit("Aa1")
-    True
-    >>> is_upper_lower_digit("abc")
-    False
-    >>> is_upper_lower_digit("A1")
-    False
-    """
-    return any(element.isupper() for element in alphabet) \
-        and any(element.islower() for element in alphabet) \
-        and any(element.isdigit() for element in alphabet)
+    """Check if the string contains at least one uppercase, one lowercase, and one digit."""
+    has_upper = has_lower = has_digit = False
+    for char in alphabet:
+        if char.isupper():
+            has_upper = True
+        elif char.islower():
+            has_lower = True
+        elif char.isdigit():
+            has_digit = True
+        if has_upper and has_lower and has_digit:
+            return True
+    return False
 
-def generate_password(length: int = 12, chars: Optional[str] = None, remove_chars: Optional[str] = None, pwned: bool = False) -> str:
+def generate_password(length: int = 12, chars: Optional[str] = None, remove_chars: Optional[str] = None, pwned: bool = False, session: Optional[requests.Session] = None) -> str:
     """
-    Return a fixed length string suitable as a password, based on
-    a randomized default or given character set.
-
-    >>> generate_password(chars="abcdefhABCDEFG12345", remove_chars="abcdeABCDE")
-    Traceback (most recent call last):
-        ...
-    ValueError: Your alphabet contains not enough characters.
+    Generate a strong password with the specified constraints.
     """
     if not chars:
         chars = string.ascii_letters + string.digits + string.punctuation + " "
 
     if remove_chars:
-        chars = [el for el in chars if el not in list(remove_chars)]
+        chars = ''.join(c for c in chars if c not in remove_chars)
 
-    # If the number of unique elements is hardly more than a set of digits, bark.
-    if len(set(list(chars))) < 12:
-        raise ValueError('Your alphabet contains not enough characters.')
+    unique_chars = set(chars)
+    if len(unique_chars) < 12:
+        raise ValueError('Your alphabet contains not enough unique characters.')
 
     can_mix = is_upper_lower_digit(chars)
-
-    # don't hammer the API due to a bug.
     max_api_attempts = 10
-    # http://www.cs.duke.edu/~ola/patterns/plopd/loops.html#loop-and-a-half
-    while True:
-        strongpw = ''.join([choice(chars) for i in range(length)])
 
-        # some projects trim whitespace, so avoid leading and trailing.
+    for attempt in range(max_api_attempts):
+        strongpw = ''.join(choice(chars) for _ in range(length))
+
         if strongpw.startswith(' ') or strongpw.endswith(' '):
             continue
 
-        # Make sure we don't have consecutive chars
-        if not re.findall(r"(.)\1", strongpw):
-            # If the alphabet allows: support at least one lower and upper character + one digit
-            if can_mix and not is_upper_lower_digit(strongpw):
+        if re.search(r"(.)\1", strongpw):
+            continue
+
+        if can_mix and not is_upper_lower_digit(strongpw):
+            continue
+
+        if pwned:
+            if is_pwned(strongpw, session):
+                logging.warning(f"Password '{strongpw}' has been pwned. Regenerating...")
                 continue
-            if pwned and max_api_attempts > 0:
-                max_api_attempts += -1
-                if is_pwned(strongpw):
-                    continue
-            elif pwned and max_api_attempts == 0:
-                raise RuntimeError('Reached our contrived API call limit.')
-            # otherwise we're done.
-            break
 
-    return strongpw
+        return strongpw
 
-def is_pwned(password: str) -> bool:
+    raise RuntimeError('Failed to generate a strong password after multiple attempts.')
+
+def is_pwned(password: str, session: Optional[requests.Session] = None) -> bool:
     """
-    Verify the generated password is not already a known password as far as the Pwned Passwords
-    service can tell.
-    Pwned Passwords are more than half a billion passwords which have previously been exposed in data breaches.
-    See https://haveibeenpwned.com/API/v3#PwnedPasswords
-
-    >>> is_pwned("1q2w3e4r5t")
-    True
+    Check if the password has been exposed in data breaches using the HaveIBeenPwned API.
     """
     password_sha1 = hashlib.sha1(password.encode()).hexdigest().upper()
-    k_anon = password_sha1[0:5]
-    k_anon_suffix = password_sha1[5:]
-    # "Padding" makes the result size of the response less predictable (MITM)
+    prefix, suffix = password_sha1[:5], password_sha1[5:]
     headers = {'Add-Padding': 'true'}
-    api_result = requests.get('https://api.pwnedpasswords.com/range/' + k_anon, headers=headers)
-    if api_result.status_code != 200:
-        raise Exception('Validation by pwnedpasswords API failed.')
-    content = api_result.text.split()
-    for ele in content:
-        if ele.startswith(k_anon_suffix) and ele.split(':')[1] != '0':
-            #print("{} found {} times in pwnedpasswords dataset.".format(password, ele.split(':')[1]))
+
+    try:
+        if session:
+            response = session.get(f'https://api.pwnedpasswords.com/range/{prefix}', headers=headers)
+        else:
+            response = requests.get(f'https://api.pwnedpasswords.com/range/{prefix}', headers=headers)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        logging.error(f"API request failed: {e}")
+        raise Exception('Validation by pwnedpasswords API failed.') from e
+
+    hashes = response.text.splitlines()
+    for line in hashes:
+        hash_suffix, count = line.split(':')
+        if hash_suffix == suffix and int(count) > 0:
             return True
     return False
 
-def main(docargs):
-    """Dispatch the work based on arguments."""
-    chars = None
-    password_length = int(docargs['<n>'] or docargs['--length'])
+def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments using argparse."""
+    parser = argparse.ArgumentParser(description="Generate a strong password.")
+    parser.add_argument('-v', '--version', action='version', version='strongpw 2.0')
+    parser.add_argument('-r', '--repeat', type=int, default=1, help='Number of passwords to generate [default: 1]')
+    parser.add_argument('-l', '--length', type=int, default=12, help='Length of password to be created [default: 12]')
+    parser.add_argument('-p', '--no-punctuation', action='store_true', help='Create password without punctuation [default: False]')
+    parser.add_argument('-t', '--target', type=str, help='The host, provider or system the password is to be created for.')
+    parser.add_argument('-d', '--delete-chars', type=str, default='', help='Remove characters from the set of characters to generate passwords.')
+    parser.add_argument('-c', '--check-pwned', action='store_true', help='Check if the password has been pwned [default: False]')
+    parser.add_argument('--list-targets', action='store_true', help='Display a list of available targets')
 
-    if docargs['--list-targets']:
+    return parser.parse_args()
+
+def main():
+    args = parse_arguments()
+
+    if args.list_targets:
         for target in TARGETS:
             print(target)
-        return 0
+        sys.exit(0)
 
-    # http://blog.codinghorror.com/your-password-is-too-damn-short/
+    password_length = args.length
+
     if password_length < 12:
-        print('Your password is too damn short.')
-        return 1
+        logging.error('Your password is too short. Minimum length is 12.')
+        sys.exit(1)
 
-    remove_chars = docargs['--delete-chars']
+    remove_chars = args.delete_chars
 
-    if docargs['--no-punctuation']:
+    if args.no_punctuation:
         chars = string.ascii_letters + string.digits + " "
+    else:
+        chars = string.ascii_letters + string.digits + string.punctuation + " "
 
-    if docargs['--target']:
-        args_target = docargs['--target']
-        if args_target in TARGETS:
-            chars = TARGETS[args_target]
+    if args.target:
+        if args.target in TARGETS:
+            chars = TARGETS[args.target]
         else:
-            print("Unknown target.")
-            return 2
+            logging.error("Unknown target specified.")
+            sys.exit(2)
 
-    for _i in range(int(docargs['--repeat'])):
-        print(generate_password(
-            password_length,
-            chars,
-            remove_chars,
-            docargs['--check-pwned']))
+    session = requests.Session() if args.check_pwned else None
 
+    try:
+        for _ in range(args.repeat):
+            password = generate_password(
+                length=password_length,
+                chars=chars,
+                remove_chars=remove_chars,
+                pwned=args.check_pwned,
+                session=session
+            )
+            print(password)
+    except Exception as e:
+        logging.error(e)
+        sys.exit(3)
+    finally:
+        if session:
+            session.close()
 
 if __name__ == "__main__":
-    sys.exit(main(docopt(__doc__, version='strongpw 2.0')))
+    main()
